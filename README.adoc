@@ -1,0 +1,243 @@
+= Trabajo Práctico de Base de Datos - 2do semestre 2020
+Alan Barraza <alanbarraza2705@gmail.com>; Franco Cisneros <francomariano147@gmail.com>;
+Gabriela Fernandez <gabriela.fernandez.92@live.com.ar>, {03/12/2020} Docentes Hernan Czemerinsky y Hernan Rondelli
+:title-page:
+:numbered:
+:source-highlighter: coderay
+:tab-size: 4
+
+== Introducción
+Este trabajo práctico consiste en la creación de una base de datos con el objetivo de almacenar información relativa a una
+tarjeta de crédito.
+
+La base de datos está compuesta por varias tablas, las cuales representan el modelo de datos deseado. Las tablas son las
+siguientes:
+
+- Cliente
+ * nrocliente:int
+ * nombre:text
+ * apellido:text
+ * domicilio:text
+ * telefono:char(12)
+
+- Tarjeta
+ * nrotarjeta:char(16)
+ * nrocliente:int
+ * validadesde:char(6)
+ * validahasta:char(6)
+ * codseguridad:char(4)
+ * limitecompra:decimal(8,2)
+ * estado:char(10)
+
+- Comercio
+ * nrocomercio:int
+ * nombre:text
+ * domicilio:text
+ * codigopostal:char(8)
+ * telefono:char(12)
+
+- Compra
+ * nrooperacion:int
+ * nrotarjeta:char(16)
+ * nrocomercio:int
+ * fecha:timestamp
+ * monto:decimal(7,2)
+ * pagado:boolean
+
+- Rechazo
+ * nrorechazo:int
+ * nrotarjeta:char(16)
+ * nrocomercio:int
+ * fecha:timestamp
+ * monto:decimal(7,2)
+ * motivo:text
+
+- Cierre
+ * año:int
+ * mes:int
+ * terminacion:int
+ * fechainicio:date
+ * fechacierre:date
+ * fechavto:date
+
+- Cabecera
+ * nroresumen:int
+ * nombre:text
+ * apellido:text
+ * domicilio:text
+ * nrotarjeta:char(16)
+ * desde:date
+ * hasta:date
+ * vence:date
+ * total:decimal(8,2)
+
+- Detalle
+ * nroresumen:int
+ * nrolinea:int
+ * fecha:date
+ * nombrecomercio:text
+ * monto:decimal(7,2)
+
+- Alerta
+ * nroalerta:int
+ * nrotarjeta:char(16)
+ * fecha:timestamp
+ * nrorechazo:int
+ * codalerta:int
+ * descripcion:text
+
+// Esta tabla no es parte del modelo de datos, pero se incluye para poder probar las funciones.
+- Consumo
+ * nrotarjeta:char(16)
+ * codseguridad:char(4)
+ * nrocomercio:int
+ * monto:decimal(7,2)
+ 
+ 
+La base de datos tiene cargados 20 clientes y 20 comercios. Todes les clientes tienen una tarjeta,
+excepto dos clientes que poseen dos tarjetas cada une. Una tarjeta deberá estar expirada
+en su fecha de vencimiento.
+La tabla cierre deberá tener los cierres de las tarjetas para todo el año 2020.
+
+
+El trabajo práctico, además, tiene incorporados los siguientes stored procedures and triggers:
+
+*Autorización de compra*
+
+Recibe los datos de una compra (número de tarjeta, código de seguridad, número de comercio y monto), y
+devuelve true si se autoriza la compra o false si se rechaza. El procedimiento valida los siguientes
+elementos antes de autorizar:
+
+ * Que el número de tarjeta sea existente, y que corresponda a alguna tarjeta vigente. En caso de que no cumpla,
+se carga un rechazo con el mensaje ?tarjeta no válida o no vigente.
+ * Que el código de seguridad sea el correcto. En caso de que no cumpla, se carga un rechazo con el
+mensaje ?código de seguridad inválido.
+ * Que el monto total de compras pendientes de pago más la compra a realizar no supere el límite de compra de la tarjeta.
+En caso de que no cumpla, se carga un rechazo con el mensaje ?supera límite de tarjeta.
+ * Que la tarjeta no se encuentre vencida. En caso de que no cumpla, se carga un rechazo con el
+mensaje ?plazo de vigencia expirado.
+ * Que la tarjeta no se encuentre suspendida. En caso que no cumpla, se carga un rechazo con el mensaje
+?la tarjeta se encuentra suspendida.
+
+Si se aprueba la compra, se deberá guardar una fila en la tabla compra, con los datos
+de la compra.
+
+
+*Generación del resumen*
+
+Recibe como parámetros el número de cliente, y el periodo del año, y guarda en las tablas que corresponda los datos
+del resumen con la siguiente información: nombre y apellido, dirección, número de tarjeta, periodo del resumen,
+fecha de vencimiento, todas las compras del periodo, y total a pagar.
+
+
+*Alertas a clientes*
+ 
+Genera alertas por posibles fraudes. Existe un Call Centre que ante cada alerta generada automáticamente, realiza un
+llamado telefónico a le cliente, indicándole la alerta detectada, y verifica si se trató de un fraude ó no.
+Se supone que la detección de alertas se ejecuta automáticamente con cierta frecuencia—e.g. de una vez por minuto.
+Se detectan y almacenan las siguientes alertas:
+
+ * Todo rechazo ingresa automáticamente a la tabla de alertas. Se ingresa en el mismo instante en que se generó el rechazo.
+ * Si una tarjeta registra dos compras en un lapso menor de un minuto en comercios distintos ubicados en el mismo código postal.
+ * Si una tarjeta registra dos compras en un lapso menor de 5 minutos en comercios con diferentes códigos postales.
+ * Si una tarjeta registra dos rechazos por exceso de límite en el mismo día, la tarjeta tiene que ser suspendida
+preventivamente, y se debe grabar una alerta asociada a este cambio de estado.
+
+Se creo una tabla con consumos virtuales para probar el sistema, y la misma contiene los atributos:
+nrotarjeta, codseguridad, nrocomercio, monto. Se realizo un procedimiento de testeo,
+que pide autorización para todos los consumos virtuales.
+
+Todo el código SQL escrito para este trabajo práctico, se puede ejecutar desde una aplicación CLI escrita en Go.
+
+Por último, para poder comparar el modelo relacional con un modelo no relacional NoSQL, se guardan los datos de clientes,
+tarjetas, comercios, y compras (tres por cada entidad) en una base de datos NoSQL basada en JSON. Para ello, se utiliza la
+base de datos BoltDB. Este código, también se puede ejecutar desde una aplicación CLI escrita en Go.
+
+
+== Descripción
+
+El tp comienza con un supermenú en donde el usuario va a tener que elegir diferentes opciones (preferentemente en orden):
+
+1) Crear la base de datos
+
+2) Crear las tablas
+
+3) Inicializar los datos
+
+4) Cargar operaciones
+
+5) Probar la tabla consumo
+
+6) Borrar las PK y FK
+
+7) Salir
+
+Por cada opción, se realiza una impresión en la pantalla notificando si ese proceso se realizó correctamente.
+
+Durante el desarrollo del trabajo práctico se presentaron varias dificultades:
+
+- Creacion del BoltDB: Se encontraron dificultades al intentar pasar de a 3 clientes al archivo BoltDB creado. Esto se solucionó pasando los clientes de a uno.
+
+- Durante la ejecución del supermenú, se notó que al momento de seleccionar las operaciones disponibles, los resultados se superponían entre si. La solución a esto, fue insertar en cada operación la función `time.Sleep (2*time.Second)`, la cual provocaba que el programa luego de ejecutar esa opción, se quede esperando 2 segundos para realizar otra operación.
+
+- Durante la implementación de las opciones del supermenú, se presentaron dificultades al acceder a la base de datos, y sobre cómo relacionar al lenguaje Go con SQL. Esto se resolvió realizando operaciones directamente sobre la base de datos, con la función `_, err := db.Exec()`.
+
+== Implementación
+
+.*Creacion de tablas* (tablas.sql)
+[source, sql]
+----
+include::tablas.sql[]
+----
+
+.*Insercion de datos* (insercionDatos.sql)
+[source, sql]
+----
+include::insercionDatos.sql[]
+----
+
+.*Autenticar compra* (autenticarCompra.sql)
+[source, sql]
+----
+include::autenticarCompra.sql[]
+----
+La función autorizacionCompra recibe como parámetros los datos de una compra realizada. A través de cuatro funciones auxiliares, que representan cada condición (si la tarjeta es valida o vigente, el código de seguridad es válido, no se supera el límite de la tarjeta, o si el plazo de vigencia de la tarjeta no está expirado) se comprueba si la compra es válida, y cumple con las condiciones planteadas.
+
+.*Generacion de resumen* (generarResumen.sql)
+[source, sql]
+----
+include::generarResumen.sql[]
+----
+La función generarResumen busca el cliente que haya realizado una compra válida, y genera un resumen basandose en los datos del cliente, la tarjeta y de la compra.
+
+.*Alertas* (alertas.sql)
+[source, sql]
+----
+include::alertas.sql[]
+----
+Las funciones dentro del archivo de alertas sirven para implementar stored procedures and triggers dentro de la base de datos, que comprueban si las compras que se realizan son válidas y coherentes, evitando de esa manera fraudes. Además, también permite la creación automática de rechazos.
+
+.*Aplicacion CLI* (CLI.go)
+[source, go]
+----
+include::CLI.go[]
+----
+En este archivo, se ejecuta el supermenú, el cual contiene todas las opciones disponibles para el usuario. Presenta prints notificando si una operación se realizó correctamente. Las opciones elegidas por el usuario, son pasadas a la base de datos SQL a través del comando `db.Exec()`, manteniendo una conexión activa con la DB en todo momento.
+
+.*BoltDB* (TPbolt.go)
+[source, go]
+----
+include::TPbolt.go[]
+----
+El archivo BoltDB se crea para poder guardar datos de la DB en un archivo `tp_fbc.db`. La función main llama a `datosClientes()`, `datosTarjetas()`, `datosComercios()` y `datosCompras()`.
+
+En `datosClientes()`, `datosTarjetas()`, `datosComercios()` y `datosCompras()` hacemos conexión con el archivo `tp_fbc.db`. Si no existe, la crea, sino la reescribe, le doy los permisos(0600) de escritura ,le pasa ej: 3 datos de clientes, hacemos `json.Marshal(nombre_cliente)` , para pasar el dato a json, con `strconv.Itoa` convierte los int a strings, para asi crear el key y value de los datos.
+
+En `createUpdate()` le pasamos el bucket creado para hacer la transacción de escritura.
+
+
+== Conclusiones
+Luego de haber realizado este trabajo práctico, concluimos que es interesante trabajar con bases de datos. Estamos satisfechos con los resultados obtenidos, ya que pudimos interactuar con la base de datos creada. Con respecto al producto terminado, pensamos que se ve bien estéticamente, aunque faltarían perfeccionar algunas cosas.
+
+Sobre alguna lección aprendida, podría decirse que adquirimos más experiencias sobre lenguajes orientados a bases de datos, como GO y SQL, y que son bastante cómodos e interesantes debido a sus funcionalidades. Además, también se aprendió a mantener una buena consistencia entre los datos.
+
